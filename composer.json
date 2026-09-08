@@ -1,0 +1,14 @@
+{
+    "name": "meihao550/suzuran",
+    "type": "library",
+    "authors": [
+        {
+            "name": "meihao550",
+            "email": "ziyin550@gmail.com"
+        }
+    ],
+    "require": {},
+    "autoload": {
+        "psr-4": { "Suzuran\\": "src/" }
+    }
+}
