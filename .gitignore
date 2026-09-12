@@ -1,2 +1,14 @@
 # composer vendor file
 vendor
+
+# PHPUnit cache
+.phpunit.cache
+
+# Rust build artifacts
+rust/logmel/target
+
+# Rust binary produced by setup.sh
+bin/logmel-rs
+
+# ONNX model asset (fetched by setup.sh)
+models/redimnet2.onnx
