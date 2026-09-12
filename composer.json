@@ -7,8 +7,21 @@
             "email": "ziyin550@gmail.com"
         }
     ],
-    "require": {},
+    "require": {
+        "php": ">=8.1",
+        "ext-ffi": "*"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^13.3"
+    },
     "autoload": {
         "psr-4": { "Suzuran\\": "src/" }
+    },
+    "autoload-dev": {
+        "psr-4": { "Suzuran\\Tests\\": "tests/" }
+    },
+    "scripts": {
+        "test": "phpunit",
+        "bench": "php tests/Benchmark/LogMelBenchmark.php"
     }
 }
