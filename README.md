@@ -31,7 +31,17 @@ composer install
 bash bin/setup.sh    # libonnxruntime (brew) + Rust logmel + ReDimNet2.onnx
 ```
 
-`models/redimnet2.onnx` は自動配布URLがまだ無いので、PyTorch版から `torch.onnx.export` するか、独自のURLを `REDIMNET2_URL` 環境変数で指定してください。
+`models/redimnet2.onnx` は自動配布URLがまだ無いので、`scripts/export_redimnet.py` で PyTorch チェックポイントから ONNX に変換します（1回きり）:
+
+```bash
+python3 -m venv scripts/.venv
+source scripts/.venv/bin/activate
+pip install torch torchaudio onnx
+python scripts/export_redimnet.py         # → models/redimnet2.onnx
+deactivate
+```
+
+`--variant b0..b6` などで別サイズのモデルを export できます。詳細は `python scripts/export_redimnet.py --help`。
 
 ## 使い方
 

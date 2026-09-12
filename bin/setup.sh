@@ -45,11 +45,17 @@ if [ ! -f models/redimnet2.onnx ]; then
         curl -L -o models/redimnet2.onnx "$REDIMNET2_URL"
     else
         cat >&2 <<'EOF'
-models/redimnet2.onnx not found and REDIMNET2_URL is not set.
-Provide the model manually, for example:
+models/redimnet2.onnx not found. Export it once with the Python helper:
+
+    python3 -m venv scripts/.venv
+    source scripts/.venv/bin/activate
+    pip install torch torchaudio onnx
+    python scripts/export_redimnet.py
+    deactivate
+
+Or provide a direct URL:
+
     REDIMNET2_URL=https://example.com/redimnet2.onnx bash bin/setup.sh
-Or export it from the PyTorch checkpoint:
-    https://github.com/IDRnD/ReDimNet
 EOF
     fi
 else

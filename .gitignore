@@ -12,3 +12,6 @@ bin/logmel-rs
 
 # ONNX model asset (fetched by setup.sh)
 models/redimnet2.onnx
+
+# Python venv for the one-shot ONNX export helper
+scripts/.venv
