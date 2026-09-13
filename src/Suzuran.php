@@ -4,8 +4,6 @@ namespace Suzuran;
 
 use Suzuran\Embedding\EmbedderInterface;
 use Suzuran\Embedding\ReDimNetEmbedder;
-use Suzuran\Feature\LogMelInterface;
-use Suzuran\Feature\PhpLogMel;
 
 class Suzuran
 {
@@ -13,11 +11,9 @@ class Suzuran
 
     public function __construct(
         private ?EmbedderInterface $embedder = null,
-        private ?LogMelInterface $logMel = null,
         private Resampler $resampler = new Resampler(),
         private CosineScorer $scorer = new CosineScorer(),
     ) {
-        $this->logMel ??= new PhpLogMel();
         $this->embedder ??= new ReDimNetEmbedder(__DIR__ . '/../models/redimnet2.onnx');
     }
 
@@ -32,7 +28,6 @@ class Suzuran
     {
         $wav = new WavConvertValue($wavPath);
         $waveform = $this->resampler->resample($wav->samples(), $wav->sampleRate(), self::TARGET_RATE);
-        $mel = $this->logMel->compute($waveform);
-        return $this->embedder->embed($mel);
+        return $this->embedder->embed($waveform);
     }
 }

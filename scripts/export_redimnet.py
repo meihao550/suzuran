@@ -1,10 +1,10 @@
-"""
+r"""
 One-shot ONNX export helper for ReDimNet2.
 
 Usage:
     python3 -m venv scripts/.venv
     source scripts/.venv/bin/activate
-    pip install torch torchaudio onnx
+    pip install torch torchaudio onnx scipy
     python scripts/export_redimnet.py
     deactivate
 
@@ -31,10 +31,9 @@ def parse_args() -> argparse.Namespace:
         help="Training regime published by IDRnD",
     )
     parser.add_argument("--dataset", default="vox2", help="Pretraining dataset")
-    parser.add_argument("--n-mels", type=int, default=80, help="Log-mel feature dim")
     parser.add_argument(
-        "--frames", type=int, default=200,
-        help="Dummy time frames for tracing (any value works, axis is dynamic)",
+        "--waveform-len", type=int, default=32000,
+        help="Dummy waveform length in samples for tracing (dynamic at inference)",
     )
     parser.add_argument(
         "--out", default="models/redimnet2.onnx", help="Output ONNX path",
@@ -54,16 +53,18 @@ def main() -> int:
         model_name=args.variant,
         train_type=args.train_type,
         dataset=args.dataset,
+        trust_repo=True,
     ).eval()
 
-    dummy = torch.randn(1, args.n_mels, args.frames)
+    # ReDimNet consumes raw 16 kHz waveform - it computes log-mel internally.
+    dummy = torch.randn(1, args.waveform_len)
     torch.onnx.export(
         model,
         dummy,
         args.out,
-        input_names=["mel"],
+        input_names=["waveform"],
         output_names=["embedding"],
-        dynamic_axes={"mel": {2: "time"}, "embedding": {0: "batch"}},
+        dynamic_axes={"waveform": {1: "samples"}, "embedding": {0: "batch"}},
         opset_version=args.opset,
     )
     print(f"wrote {args.out}", file=sys.stderr)

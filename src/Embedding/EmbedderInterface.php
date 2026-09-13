@@ -5,8 +5,8 @@ namespace Suzuran\Embedding;
 interface EmbedderInterface
 {
     /**
-     * @param float[][] $mel log-mel matrix, shape [nMels][nFrames]
+     * @param float[] $waveform raw 16 kHz mono waveform in [-1, 1]
      * @return float[] 192-dim speaker embedding
      */
-    public function embed(array $mel): array;
+    public function embed(array $waveform): array;
 }

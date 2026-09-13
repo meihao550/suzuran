@@ -48,21 +48,23 @@ class ReDimNetEmbedder implements EmbedderInterface
         $this->ffi = FFI::cdef($this->headerSource(), $libraryPath);
 
         $base = $this->ffi->OrtGetApiBase();
-        $this->api = $base[0]->GetApi(self::ORT_API_VERSION);
+        // PHP FFI cannot call struct function-pointer fields via ->method();
+        // it needs the extra parens: ($struct->fn)(args).
+        $this->api = ($base[0]->GetApi)(self::ORT_API_VERSION);
         if (FFI::isNull($this->api)) {
             throw new RuntimeException('OrtGetApiBase()->GetApi returned null (API version mismatch)');
         }
 
         $envPtr = $this->ffi->new('OrtEnv*');
-        $this->check($this->api[0]->CreateEnv(3 /* WARNING */, 'suzuran', FFI::addr($envPtr)));
+        $this->check(($this->api[0]->CreateEnv)(3 /* WARNING */, 'suzuran', FFI::addr($envPtr)));
         $this->env = $envPtr;
 
         $optsPtr = $this->ffi->new('OrtSessionOptions*');
-        $this->check($this->api[0]->CreateSessionOptions(FFI::addr($optsPtr)));
+        $this->check(($this->api[0]->CreateSessionOptions)(FFI::addr($optsPtr)));
         $this->sessionOptions = $optsPtr;
 
         $sessionPtr = $this->ffi->new('OrtSession*');
-        $this->check($this->api[0]->CreateSession(
+        $this->check(($this->api[0]->CreateSession)(
             $this->env,
             $modelPath,
             $this->sessionOptions,
@@ -71,11 +73,11 @@ class ReDimNetEmbedder implements EmbedderInterface
         $this->session = $sessionPtr;
 
         $memPtr = $this->ffi->new('OrtMemoryInfo*');
-        $this->check($this->api[0]->CreateCpuMemoryInfo(0 /* Arena */, 0 /* CPU */, FFI::addr($memPtr)));
+        $this->check(($this->api[0]->CreateCpuMemoryInfo)(0 /* Arena */, 0 /* CPU */, FFI::addr($memPtr)));
         $this->memoryInfo = $memPtr;
 
         $allocatorPtr = $this->ffi->new('OrtAllocator*');
-        $this->check($this->api[0]->GetAllocatorWithDefaultOptions(FFI::addr($allocatorPtr)));
+        $this->check(($this->api[0]->GetAllocatorWithDefaultOptions)(FFI::addr($allocatorPtr)));
 
         $this->inputName = $this->readName($this->session, $allocatorPtr, true);
         $this->outputName = $this->readName($this->session, $allocatorPtr, false);
@@ -84,50 +86,42 @@ class ReDimNetEmbedder implements EmbedderInterface
     public function __destruct()
     {
         if (isset($this->session)) {
-            $this->api[0]->ReleaseSession($this->session);
+            ($this->api[0]->ReleaseSession)($this->session);
         }
         if (isset($this->sessionOptions)) {
-            $this->api[0]->ReleaseSessionOptions($this->sessionOptions);
+            ($this->api[0]->ReleaseSessionOptions)($this->sessionOptions);
         }
         if (isset($this->memoryInfo)) {
-            $this->api[0]->ReleaseMemoryInfo($this->memoryInfo);
+            ($this->api[0]->ReleaseMemoryInfo)($this->memoryInfo);
         }
         if (isset($this->env)) {
-            $this->api[0]->ReleaseEnv($this->env);
+            ($this->api[0]->ReleaseEnv)($this->env);
         }
     }
 
-    public function embed(array $mel): array
+    public function embed(array $waveform): array
     {
-        $nMels = count($mel);
-        if ($nMels === 0) {
-            throw new RuntimeException('empty mel matrix');
-        }
-        $nFrames = count($mel[0]);
-        if ($nFrames === 0) {
-            throw new RuntimeException('mel matrix has zero frames');
+        $n = count($waveform);
+        if ($n === 0) {
+            throw new RuntimeException('empty waveform');
         }
 
-        $total = $nMels * $nFrames;
-        $buffer = $this->ffi->new("float[$total]", false);
-        for ($m = 0; $m < $nMels; $m++) {
-            for ($t = 0; $t < $nFrames; $t++) {
-                $buffer[$m * $nFrames + $t] = (float) $mel[$m][$t];
-            }
+        $buffer = $this->ffi->new("float[$n]", false);
+        for ($i = 0; $i < $n; $i++) {
+            $buffer[$i] = (float) $waveform[$i];
         }
 
-        $shape = $this->ffi->new('int64_t[3]', false);
+        $shape = $this->ffi->new('int64_t[2]', false);
         $shape[0] = 1;
-        $shape[1] = $nMels;
-        $shape[2] = $nFrames;
+        $shape[1] = $n;
 
         $inputTensor = $this->ffi->new('OrtValue*');
-        $this->check($this->api[0]->CreateTensorWithDataAsOrtValue(
+        $this->check(($this->api[0]->CreateTensorWithDataAsOrtValue)(
             $this->memoryInfo,
             FFI::addr($buffer[0]),
-            $total * FFI::sizeof($this->ffi->type('float')),
+            $n * FFI::sizeof($this->ffi->type('float')),
             $shape,
-            3,
+            2,
             1 /* ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT */,
             FFI::addr($inputTensor),
         ));
@@ -135,33 +129,33 @@ class ReDimNetEmbedder implements EmbedderInterface
         $inputNames = $this->ffi->new('char*[1]', false);
         $inputNameC = $this->ffi->new('char[' . (strlen($this->inputName) + 1) . ']', false);
         FFI::memcpy($inputNameC, $this->inputName, strlen($this->inputName));
-        $inputNames[0] = FFI::cast('char*', FFI::addr($inputNameC[0]));
+        $inputNames[0] = $this->ffi->cast('char*', FFI::addr($inputNameC[0]));
 
         $outputNames = $this->ffi->new('char*[1]', false);
         $outputNameC = $this->ffi->new('char[' . (strlen($this->outputName) + 1) . ']', false);
         FFI::memcpy($outputNameC, $this->outputName, strlen($this->outputName));
-        $outputNames[0] = FFI::cast('char*', FFI::addr($outputNameC[0]));
+        $outputNames[0] = $this->ffi->cast('char*', FFI::addr($outputNameC[0]));
 
         $inputs = $this->ffi->new('OrtValue*[1]', false);
         $inputs[0] = $inputTensor;
         $outputs = $this->ffi->new('OrtValue*[1]', false);
         $outputs[0] = null;
 
-        $this->check($this->api[0]->Run(
+        $this->check(($this->api[0]->Run)(
             $this->session,
             null,
-            FFI::cast('const char* const*', FFI::addr($inputNames[0])),
-            FFI::cast('const OrtValue* const*', FFI::addr($inputs[0])),
+            $this->ffi->cast('const char* const*', FFI::addr($inputNames[0])),
+            $this->ffi->cast('const OrtValue* const*', FFI::addr($inputs[0])),
             1,
-            FFI::cast('const char* const*', FFI::addr($outputNames[0])),
+            $this->ffi->cast('const char* const*', FFI::addr($outputNames[0])),
             1,
             FFI::addr($outputs[0]),
         ));
 
         try {
             $dataPtr = $this->ffi->new('void*');
-            $this->check($this->api[0]->GetTensorMutableData($outputs[0], FFI::addr($dataPtr)));
-            $floatPtr = FFI::cast("float[" . self::OUTPUT_DIM . "]", $dataPtr);
+            $this->check(($this->api[0]->GetTensorMutableData)($outputs[0], FFI::addr($dataPtr)));
+            $floatPtr = $this->ffi->cast("float[" . self::OUTPUT_DIM . "]", $dataPtr);
 
             $embedding = [];
             for ($i = 0; $i < self::OUTPUT_DIM; $i++) {
@@ -169,21 +163,23 @@ class ReDimNetEmbedder implements EmbedderInterface
             }
             return $embedding;
         } finally {
-            $this->api[0]->ReleaseValue($outputs[0]);
-            $this->api[0]->ReleaseValue($inputTensor);
+            ($this->api[0]->ReleaseValue)($outputs[0]);
+            ($this->api[0]->ReleaseValue)($inputTensor);
             FFI::free($buffer);
             FFI::free($shape);
         }
     }
 
-    /** @param \FFI\CData $status */
+    /** @param \FFI\CData|null $status */
     private function check($status): void
     {
-        if (FFI::isNull($status)) {
+        // PHP FFI auto-converts NULL pointers into PHP null on function-pointer returns.
+        if ($status === null || FFI::isNull($status)) {
             return;
         }
-        $msg = FFI::string($this->api[0]->GetErrorMessage($status));
-        $this->api[0]->ReleaseStatus($status);
+        $msg = ($this->api[0]->GetErrorMessage)($status);
+        $msg = is_string($msg) ? $msg : FFI::string($msg);
+        ($this->api[0]->ReleaseStatus)($status);
         throw new RuntimeException("OrtStatus: {$msg}");
     }
 
@@ -192,11 +188,11 @@ class ReDimNetEmbedder implements EmbedderInterface
     {
         $namePtr = $this->ffi->new('char*');
         $status = $isInput
-            ? $this->api[0]->SessionGetInputName($session, 0, $allocator, FFI::addr($namePtr))
-            : $this->api[0]->SessionGetOutputName($session, 0, $allocator, FFI::addr($namePtr));
+            ? ($this->api[0]->SessionGetInputName)($session, 0, $allocator, FFI::addr($namePtr))
+            : ($this->api[0]->SessionGetOutputName)($session, 0, $allocator, FFI::addr($namePtr));
         $this->check($status);
         $name = FFI::string($namePtr);
-        $this->api[0]->AllocatorFree($allocator, FFI::cast('void*', $namePtr));
+        ($this->api[0]->AllocatorFree)($allocator, $this->ffi->cast('void*', $namePtr));
         return $name;
     }
 
